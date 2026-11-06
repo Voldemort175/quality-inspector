@@ -73,7 +73,7 @@ From inside the `quality-inspector` folder (after the install step above):
 python -m unittest -v
 ```
 
-This runs 41 tests, using only Python's built-in `unittest`. The tests save to temporary files, so they never touch your real `inspection.json`.
+This runs 55 tests, using only Python's built-in `unittest`. The tests save to temporary files, so they never touch your real `inspection.json`.
 
 - `test_verdict.py` tests the rules: the six required cases, zero defects, invalid sample sizes, row selection, and every limit in the table.
 - `test_app.py` tests the website: the same cases entered through the forms, plus error messages, saving, and escaping of typed text.
