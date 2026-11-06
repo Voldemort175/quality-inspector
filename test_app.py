@@ -4,6 +4,7 @@ Run with: python -m unittest -v
 Every test saves to its own temporary file, so real data is never touched.
 """
 
+import json
 import os
 import re
 import tempfile
@@ -192,6 +193,131 @@ class ListAndPersistence(WebsiteTestCase):
         html = self.page()
         self.assertNotIn("<b>bold</b>", html)
         self.assertIn("&lt;b&gt;bold&lt;/b&gt;", html)
+
+
+class StartingAndReplacing(WebsiteTestCase):
+    """What happens to the saved inspection when you start (or fail to start) another."""
+
+    def test_rejected_start_leaves_current_inspection_untouched(self):
+        self.start("B-OLD", 40)
+        self.add_defect("major", "old one")
+        self.add_defect("minor", "old two")
+        self.assertEqual(self.start("B-NEW", 0).status_code, 400)  # refused
+        html = self.page()
+        self.assertIn("B-OLD", html)
+        self.assertNotIn("B-NEW", html)
+        self.assertIn("major: old one", html)
+        self.assertIn("minor: old two", html)
+        self.assertEqual(self.verdict_on_page(), "ACCEPT")
+
+    def test_rejected_start_with_nothing_started_saves_nothing(self):
+        self.assertEqual(self.start("B-1", 0).status_code, 400)
+        self.assertIn("No inspection started yet", self.page())
+        self.assertFalse(os.path.exists(app_module.app.config["DATA_PATH"]))
+
+    def test_starting_again_replaces_the_old_inspection_and_its_defects(self):
+        self.start("B-1", 40)
+        self.add_defect("critical", "old defect")  # would make the old batch REJECT
+        self.start("B-2", 150)
+        html = self.page()
+        self.assertIn("B-2", html)
+        self.assertNotIn("B-1", html)
+        self.assertNotIn("old defect", html)
+        self.assertIn("No defects recorded", html)
+        self.assertEqual(self.verdict_on_page(), "ACCEPT")
+
+    def test_same_batch_id_with_a_new_sample_size_also_replaces(self):
+        # Documented in DECISIONS.md: this overwrites without any warning.
+        self.start("B-1", 40)
+        self.add_defect("major", "x")
+        self.add_defect("major", "y")
+        self.start("B-1", 150)
+        html = self.page()
+        self.assertIn("sample size <strong>150</strong>", html)
+        self.assertIn("No defects recorded", html)
+
+
+class SampleSizeTyping(WebsiteTestCase):
+    def test_small_negative_numbers_are_refused(self):
+        for text in ("-5", "-1", "-0"):
+            with self.subTest(sample_size=text):
+                response = self.start("B-1", text)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(
+                    "Sample size must be at least 1", response.get_data(as_text=True)
+                )
+                self.assertIsNone(self.verdict_on_page())
+
+    def test_spaces_around_the_sample_size_are_ignored(self):
+        self.assertEqual(self.start("B-1", "  40  ").status_code, 302)
+        self.assertIn("sample size <strong>40</strong>", self.page())
+
+
+class RedirectAfterPost(WebsiteTestCase):
+    """After a form is sent the browser is redirected, so refreshing the page
+    does not send the same form (and record the same defect) a second time."""
+
+    def test_starting_redirects_to_the_page(self):
+        response = self.start("B-1", 40)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/"))
+
+    def test_recording_a_defect_redirects_to_the_page(self):
+        self.start("B-1", 40)
+        response = self.add_defect("major")
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/"))
+
+class CountsAndLimitsTable(WebsiteTestCase):
+    """The table under the verdict must show the right numbers, not just the right word."""
+
+    def table_row(self, html, severity):
+        match = re.search(
+            rf"<tr><td>{severity}</td><td>(\d+)</td><td>(\d+)</td></tr>", html
+        )
+        return (int(match.group(1)), int(match.group(2))) if match else None
+
+    def test_table_shows_each_count_and_limit(self):
+        # Different numbers in every cell, so a mix-up between columns can't hide.
+        cases = [
+            # sample size, defects,                                  (count, limit) per severity
+            (40, ["critical"] * 2 + ["major"] * 3 + ["minor"] * 5, {"critical": (2, 0), "major": (3, 3), "minor": (5, 7)}),
+            (150, ["major"] * 6 + ["minor"] * 13, {"critical": (0, 0), "major": (6, 6), "minor": (13, 13)}),
+            (600, ["major"] * 9 + ["minor"] * 4, {"critical": (0, 0), "major": (9, 12), "minor": (4, 26)}),
+        ]
+        for size, severities, expected in cases:
+            with self.subTest(sample_size=size):
+                self.run_case(size, severities)
+                html = self.page()
+                for severity, row in expected.items():
+                    self.assertEqual(self.table_row(html, severity), row, severity)
+
+
+class TypedTextAndTolerance(WebsiteTestCase):
+    def test_batch_id_is_escaped_not_run_as_html(self):
+        self.start("<b>x</b>", 40)
+        html = self.page()
+        self.assertNotIn("<b>x</b>", html)
+        self.assertIn("&lt;b&gt;x&lt;/b&gt;", html)
+
+    def test_severity_capitals_and_spaces_are_tolerated(self):
+        self.start("B-1", 40)
+        self.assertEqual(self.add_defect("MAJOR", "first").status_code, 302)
+        self.assertEqual(self.add_defect(" major ", "second").status_code, 302)
+        html = self.page()
+        self.assertIn("major: first", html)  # stored in lower case
+        self.assertIn("major: second", html)
+
+    def test_saved_file_with_an_invalid_sample_size_explains_why(self):
+        # Only possible if the data file is edited by hand, but it must not crash
+        # and must still refuse to give a verdict (rule R4).
+        with open(app_module.app.config["DATA_PATH"], "w", encoding="utf-8") as f:
+            json.dump({"batch_id": "B-1", "sample_size": 0, "defects": []}, f)
+        response = self.client.get("/")
+        html = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Sample size must be at least 1", html)
+        self.assertIsNone(self.verdict_on_page())
 
 
 if __name__ == "__main__":
