@@ -3,19 +3,28 @@
 A small website for factory quality inspections. An inspector starts an inspection for a batch (batch ID and sample size), records each defect found (critical, major or minor, with a short description), sees the list of defects so far, and gets a verdict of ACCEPT or REJECT. The verdict comes from the acceptance-limits table in the brief, is recomputed from the recorded defects every time the page loads, and is shown next to a small table of each count against its limit. An invalid sample size shows a clear error and no verdict. Data is saved in a JSON file; there is no database, login or styling.
 
 ## What you need
+- Git
 - Python 3 (developed and tested on Python 3.13)
-- Nothing else. Flask is installed by the command below.
+- Nothing else. Flask is installed by the install command below.
+
+On macOS or Linux, use `python3` instead of `python` in every command in this file.
 
 ## Install
-Open a terminal in the project folder (the one that contains `app.py`) and run:
+Clone the repository and go into its folder:
+
+```bash
+git clone https://github.com/Voldemort175/quality-inspector.git
+cd quality-inspector
+```
+
+Then install the one dependency (Flask):
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-On macOS or Linux, use `python3` instead of `python` in every command in this file.
-
 ## Run the website
+From inside the `quality-inspector` folder:
 
 ```bash
 python app.py
@@ -58,6 +67,7 @@ Otherwise the batch is **ACCEPT**. A count that lands exactly on a limit is stil
 **Invalid sample sizes.** A sample size below 1, above 1,000,000, or not a whole number is refused with a clear error, and no verdict is shown.
 
 ## Run the tests
+From inside the `quality-inspector` folder (after the install step above):
 
 ```bash
 python -m unittest -v
