@@ -1,0 +1,6 @@
+# Python cache files
+__pycache__/
+*.pyc
+
+# The live data file the website writes while running
+inspection.json
