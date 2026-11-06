@@ -30,6 +30,33 @@ Then open http://127.0.0.1:5000 in your browser. Press Ctrl+C in the terminal to
 
 The current inspection is saved in `inspection.json` in the project folder, so it survives a page refresh or a restart. Delete that file to start from a blank site. Starting a new inspection replaces the old one.
 
+## How the verdict is calculated
+
+The limits come from this table, using the sample size of the inspection:
+
+| Sample size (at least) | Major limit | Minor limit |
+|---|---|---|
+| 1 | 0 | 1 |
+| 10 | 1 | 3 |
+| 40 | 3 | 7 |
+| 150 | 6 | 13 |
+| 600 | 12 | 26 |
+
+**Step 1: pick the row.** Use the row with the largest "at least" value that is less than or equal to the sample size. Rows are never blended together.
+- Sample size 39 uses the **10** row (limits 1 and 3).
+- Sample size 40 uses the **40** row, not the 10 row (limits 3 and 7).
+- Sample size 100 uses the **40** row (limits 3 and 7).
+- Sample size 900 uses the **600** row (limits 12 and 26).
+
+**Step 2: decide.** The batch is **REJECT** if any of these is true:
+- there is **1 or more** critical defect, or
+- the number of major defects is **greater than** the major limit, or
+- the number of minor defects is **greater than** the minor limit.
+
+Otherwise the batch is **ACCEPT**. A count that lands exactly on a limit is still acceptable (for sample size 40, 3 major defects is ACCEPT and 4 is REJECT). An inspection with no defects is ACCEPT.
+
+**Invalid sample sizes.** A sample size below 1, above 1,000,000, or not a whole number is refused with a clear error, and no verdict is shown.
+
 ## Run the tests
 
 ```bash
