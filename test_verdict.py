@@ -105,5 +105,60 @@ class ExactLimitEdges(unittest.TestCase):
         self.assertEqual(result["minor_limit"], 7)
 
 
+class EveryLimitInTheTable(unittest.TestCase):
+    """Check every number in the brief's table, not just the row boundaries.
+
+    The expected numbers below are typed in again from the brief, on purpose.
+    They are a second, independent copy of the table. If someone mistypes a
+    limit in verdict.py, this test will disagree with it and fail.
+    """
+
+    # sample size at least: (major limit, minor limit)
+    BRIEF_TABLE = {
+        1: (0, 1),
+        10: (1, 3),
+        40: (3, 7),
+        150: (6, 13),
+        600: (12, 26),
+    }
+
+    def test_major_limit_of_every_row(self):
+        for size, (major_limit, _) in self.BRIEF_TABLE.items():
+            with self.subTest(sample_size=size, major_limit=major_limit):
+                on_limit = compute_verdict(size, ["major"] * major_limit)
+                over_limit = compute_verdict(size, ["major"] * (major_limit + 1))
+                self.assertEqual(on_limit["verdict"], "ACCEPT")  # exactly on is fine
+                self.assertEqual(over_limit["verdict"], "REJECT")  # one over is not
+
+    def test_minor_limit_of_every_row(self):
+        for size, (_, minor_limit) in self.BRIEF_TABLE.items():
+            with self.subTest(sample_size=size, minor_limit=minor_limit):
+                on_limit = compute_verdict(size, ["minor"] * minor_limit)
+                over_limit = compute_verdict(size, ["minor"] * (minor_limit + 1))
+                self.assertEqual(on_limit["verdict"], "ACCEPT")
+                self.assertEqual(over_limit["verdict"], "REJECT")
+
+    def test_limits_hold_across_the_whole_row_not_just_its_first_size(self):
+        # Last size before the next row starts, plus one size far above the table.
+        last_size_of_row = {1: 9, 10: 39, 40: 149, 150: 599, 600: 5000}
+        for row_start, size in last_size_of_row.items():
+            major_limit, minor_limit = self.BRIEF_TABLE[row_start]
+            with self.subTest(sample_size=size):
+                self.assertEqual(
+                    compute_verdict(size, ["major"] * major_limit)["verdict"], "ACCEPT"
+                )
+                self.assertEqual(
+                    compute_verdict(size, ["major"] * (major_limit + 1))["verdict"],
+                    "REJECT",
+                )
+                self.assertEqual(
+                    compute_verdict(size, ["minor"] * minor_limit)["verdict"], "ACCEPT"
+                )
+                self.assertEqual(
+                    compute_verdict(size, ["minor"] * (minor_limit + 1))["verdict"],
+                    "REJECT",
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
