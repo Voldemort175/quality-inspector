@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Quality Inspector</title>
+</head>
+<body>
+  <h1>Quality Inspector</h1>
+
+  {% if error %}
+    <p><strong>Error:</strong> {{ error }}</p>
+  {% endif %}
+
+  <h2>1. Start an inspection</h2>
+  <form method="post" action="/start">
+    <label>Batch ID: <input type="text" name="batch_id"></label>
+    <label>Sample size: <input type="text" name="sample_size"></label>
+    <button type="submit">Start inspection</button>
+  </form>
+
+  {% if inspection %}
+    <p>Current inspection: batch <strong>{{ inspection.batch_id }}</strong>,
+       sample size <strong>{{ inspection.sample_size }}</strong></p>
+
+    <h2>2. Record a defect</h2>
+    <form method="post" action="/defect">
+      <label>Severity:
+        <select name="severity">
+          {% for s in severities %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Description: <input type="text" name="description"></label>
+      <button type="submit">Record defect</button>
+    </form>
+
+    <h2>3. Defects recorded so far</h2>
+    {% if inspection.defects %}
+      <ol>
+        {% for d in inspection.defects %}
+          <li>{{ d.severity }}: {{ d.description }}</li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p>No defects recorded.</p>
+    {% endif %}
+
+    <h2>4. Verdict</h2>
+    {% if result %}
+      <p>Verdict: <strong id="verdict">{{ result.verdict }}</strong></p>
+      <table border="1">
+        <tr><th>Severity</th><th>Recorded</th><th>Limit (REJECT if above)</th></tr>
+        <tr><td>critical</td><td>{{ result.critical }}</td><td>0</td></tr>
+        <tr><td>major</td><td>{{ result.major }}</td><td>{{ result.major_limit }}</td></tr>
+        <tr><td>minor</td><td>{{ result.minor }}</td><td>{{ result.minor_limit }}</td></tr>
+      </table>
+    {% else %}
+      <p>No verdict: the sample size is invalid.</p>
+    {% endif %}
+  {% else %}
+    <p>No inspection started yet.</p>
+  {% endif %}
+</body>
+</html>
