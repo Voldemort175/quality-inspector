@@ -97,6 +97,45 @@ class InvalidInputThroughTheWebsite(WebsiteTestCase):
                 self.assertIn("whole number", response.get_data(as_text=True))
                 self.assertIsNone(self.verdict_on_page())
 
+    def test_huge_sample_size_shows_the_too_large_message(self):
+        # 10353 digits: the exact situation that used to show Python's own
+        # "Exceeds the limit (4300 digits) for integer string conversion" error.
+        for digits in (10353, 4301, 4300, 8):
+            with self.subTest(digits=digits):
+                response = self.start("B-1", "9" * digits)
+                html = response.get_data(as_text=True)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(
+                    "Inspection not started. Sample size is too large (maximum 1,000,000).",
+                    html,
+                )
+                self.assertNotIn("integer string conversion", html)
+                self.assertNotIn("4300", html)
+                self.assertIsNone(self.verdict_on_page())
+
+    def test_one_over_the_maximum_is_refused_and_the_maximum_is_allowed(self):
+        response = self.start("B-1", "1000001")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Sample size is too large (maximum 1,000,000)", response.get_data(as_text=True))
+
+        response = self.start("B-1", "1000000")
+        self.assertEqual(response.status_code, 302)  # accepted, redirected to the page
+        self.assertIn("1000000", self.page())
+
+    def test_huge_negative_number_says_at_least_1(self):
+        response = self.start("B-1", "-" + "9" * 10353)
+        html = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Sample size must be at least 1", html)
+        self.assertNotIn("integer string conversion", html)
+
+    def test_very_long_number_made_of_leading_zeros_is_still_just_40(self):
+        self.assertEqual(self.start("B-1", "0" * 10000 + "40").status_code, 302)
+        self.assertIn("sample size <strong>40</strong>", self.page())
+        for _ in range(3):
+            self.add_defect("major")
+        self.assertEqual(self.verdict_on_page(), "ACCEPT")  # 3 majors, size 40
+
     def test_empty_batch_id_is_refused(self):
         response = self.start("   ", 40)
         self.assertEqual(response.status_code, 400)

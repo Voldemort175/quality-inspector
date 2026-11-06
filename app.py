@@ -8,7 +8,7 @@ import re
 from flask import Flask, redirect, render_template, url_for, request
 
 import store
-from verdict import InvalidSampleSize, compute_verdict
+from verdict import MAX_SAMPLE_SIZE, InvalidSampleSize, compute_verdict, too_large_message
 
 app = Flask(__name__)
 # Where the inspection is saved. Tests change this to a temporary file.
@@ -24,7 +24,19 @@ def parse_sample_size(text):
     text = (text or "").strip()
     if not re.fullmatch(r"-?\d+", text):
         raise InvalidSampleSize(f"Sample size must be a whole number, got {text!r}.")
-    return int(text)
+
+    # Python refuses to convert a string of more than 4300 digits into a number
+    # (it raises its own confusing error), so we look at the length first.
+    # Leading zeros are dropped so "0000040" still counts as 40.
+    is_negative = text.startswith("-")
+    digits = text.lstrip("-").lstrip("0")
+    if len(digits) > len(str(MAX_SAMPLE_SIZE)):
+        if is_negative:
+            raise InvalidSampleSize("Sample size must be at least 1.")
+        raise InvalidSampleSize(too_large_message())
+
+    value = int(digits) if digits else 0
+    return -value if is_negative else value
 
 
 def show_page(error=None, status=200):

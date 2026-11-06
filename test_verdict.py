@@ -61,6 +61,22 @@ class InvalidInput(unittest.TestCase):
             compute_verdict(40, ["huge"])
 
 
+class MaximumSampleSize(unittest.TestCase):
+    def test_exactly_the_maximum_is_allowed(self):
+        self.assertEqual(select_row(1_000_000)[0], 600)
+
+    def test_one_over_the_maximum_is_refused_with_clear_message(self):
+        with self.assertRaises(InvalidSampleSize) as caught:
+            compute_verdict(1_000_001, [])
+        self.assertEqual(
+            str(caught.exception), "Sample size is too large (maximum 1,000,000)."
+        )
+
+    def test_a_gigantic_number_is_refused(self):
+        with self.assertRaises(InvalidSampleSize):
+            compute_verdict(10**10_000, [])
+
+
 class RowSelection(unittest.TestCase):
     """Rule R1: use the row with the largest 'at least' value <= sample size."""
 

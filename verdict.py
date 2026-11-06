@@ -15,6 +15,16 @@ LIMITS = [
 ]
 
 
+# The largest sample size we accept. The brief doesn't set a maximum, but an
+# absurdly large number is certainly a typing mistake, and very long numbers
+# can't be handled safely.
+MAX_SAMPLE_SIZE = 1_000_000
+
+
+def too_large_message():
+    return f"Sample size is too large (maximum {MAX_SAMPLE_SIZE:,})."
+
+
 class InvalidSampleSize(ValueError):
     """Raised when the sample size is not a whole number of at least 1."""
 
@@ -35,6 +45,8 @@ def select_row(sample_size):
         raise InvalidSampleSize(
             f"Sample size must be at least 1, got {sample_size}."
         )
+    if sample_size > MAX_SAMPLE_SIZE:
+        raise InvalidSampleSize(too_large_message())
 
     chosen = LIMITS[0]
     for row in LIMITS:
