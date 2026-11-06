@@ -43,3 +43,42 @@ def select_row(sample_size):
         else:
             break  # rows are in order, so no later row can fit
     return chosen
+
+
+SEVERITIES = ("critical", "major", "minor")
+
+
+def compute_verdict(sample_size, severities):
+    """Decide ACCEPT or REJECT for an inspection.
+
+    sample_size: a whole number, at least 1.
+    severities:  a list with one entry per defect, e.g. ["major", "minor", "major"].
+
+    Returns a dict with the verdict and the numbers behind it, so the page can
+    show *why*. If the sample size is invalid this raises InvalidSampleSize and
+    gives back no verdict at all (rule R4).
+    """
+    # Raises InvalidSampleSize for bad input, before we count anything.
+    _, major_limit, minor_limit = select_row(sample_size)
+
+    for severity in severities:
+        if severity not in SEVERITIES:
+            raise ValueError(f"Unknown severity: {severity!r}")
+
+    critical = severities.count("critical")
+    major = severities.count("major")
+    minor = severities.count("minor")
+
+    # Rule R2: REJECT if any of these is true. Note "greater than" (>), not ">=":
+    # a count that lands exactly on the limit is still acceptable.
+    rejected = critical >= 1 or major > major_limit or minor > minor_limit
+
+    # Rule R3: otherwise ACCEPT (this includes zero defects).
+    return {
+        "verdict": "REJECT" if rejected else "ACCEPT",
+        "critical": critical,
+        "major": major,
+        "minor": minor,
+        "major_limit": major_limit,
+        "minor_limit": minor_limit,
+    }
