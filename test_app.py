@@ -74,6 +74,18 @@ class RequiredCasesThroughTheWebsite(WebsiteTestCase):
         self.assertEqual(self.run_case(60, ["critical"]), "REJECT")
 
 
+class VerdictColour(WebsiteTestCase):
+    """ACCEPT is shown in green and REJECT in red (the word is still shown too)."""
+
+    def test_accept_is_green(self):
+        self.run_case(40, ["major"] * 3)
+        self.assertIn('style="color: #008000;" id="verdict">ACCEPT<', self.page())
+
+    def test_reject_is_red(self):
+        self.run_case(40, ["major"] * 4)
+        self.assertIn('style="color: #cc0000;" id="verdict">REJECT<', self.page())
+
+
 class ZeroDefectsThroughTheWebsite(WebsiteTestCase):
     def test_no_defects_is_accept(self):
         self.assertEqual(self.run_case(40, []), "ACCEPT")

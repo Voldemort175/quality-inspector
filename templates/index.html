@@ -46,7 +46,7 @@
 
     <h2>4. Verdict</h2>
     {% if result %}
-      <p>Verdict: <strong id="verdict">{{ result.verdict }}</strong></p>
+      <p>Verdict: <strong style="color: {{ '#008000' if result.verdict == 'ACCEPT' else '#cc0000' }};" id="verdict">{{ result.verdict }}</strong></p>
       <table border="1">
         <tr><th>Severity</th><th>Recorded</th><th>Limit (REJECT if above)</th></tr>
         <tr><td>critical</td><td>{{ result.critical }}</td><td>0</td></tr>
